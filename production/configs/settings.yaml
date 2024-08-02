@@ -1,0 +1,27 @@
+# Permite elegir los valores que queremos scrapear.
+
+url: https://listado.mercadolibre.com.ar/celulares-telefonos/celulares-smartphones/{brand}/{condition}/_Desde_{page_number}_{memory}NoIndex_True_{ram}original*category*landing_true
+condition:
+  nuevo
+  # usado
+brand:
+  - google
+  - huawei
+  - samsung
+  - motorola
+  - xiaomi
+  - apple
+ram:
+  # RAM_*-4GB_
+  # RAM_4GB-6GB_
+  # RAM_6GB-12GB_
+  # RAM_12GB-*_
+memory:
+  # INTERNAL*MEMORY_64GB-256GB_
+  # INTERNAL*MEMORY_256GB-512GB_
+  # INTERNAL*MEMORY_512GB-*
+  # INTERNAL*MEMORY_*-64GB_
+bucket:
+  data
+raw_data_folder: 
+  raw

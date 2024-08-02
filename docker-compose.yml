@@ -1,0 +1,145 @@
+x-spark-common: &spark-common
+  build:
+    context: .
+    dockerfile: Dockerfiles/spark.Dockerfile
+  volumes:
+    - ./production:/opt/spark/jobs
+  networks:
+    - admin
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfiles/airflow.Dockerfile
+  env_file:
+    - Dockerfiles/conf/airflow.env
+  volumes:
+    - ./production:/opt/airflow/jobs
+    - ./production/dags:/opt/airflow/dags
+  depends_on:
+    - postgres
+  networks:
+    - admin
+
+services:
+  spark-master:
+    <<: *spark-common
+    container_name: Spark-Master
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+    ports:
+      - "9090:8080"
+      - "7077:7077"
+
+  spark-worker-1:
+    <<: *spark-common
+    container_name: Spark-Worker-1
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_MODE: worker
+      SPARK_WORKER_CORES: 3
+      SPARK_WORKER_MEMORY: 4g
+      SPARK_MASTER_URL: spark://spark-master:7077
+
+  spark-worker-2:
+    <<: *spark-common
+    container_name: Spark-Worker-2
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_MODE: worker
+      SPARK_WORKER_CORES: 3
+      SPARK_WORKER_MEMORY: 4g
+      SPARK_MASTER_URL: spark://spark-master:7077
+
+  postgres:
+    container_name: PostgreSQL
+    image: postgres:14.0
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=default
+    volumes:
+      - ./Dockerfiles/conf/init-hive-metastore-db.sh:/docker-entrypoint-initdb.d/init-hive-metastore-db.sh
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - admin
+
+  webserver:
+    <<: *airflow-common
+    container_name: Airflow-Webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      - scheduler
+
+  scheduler:
+    <<: *airflow-common
+    container_name: Airflow-Scheduler
+    command: bash -c "airflow db migrate && airflow users create --username admin --firstname Nahuel --lastname Navales --role Admin --email navalesnahuel@gmail.com --password admin && airflow scheduler"
+
+  minio:
+    container_name: MinIO
+    image: "minio/minio:latest"
+    volumes:
+      - minio_data:/data
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      MINIO_ROOT_USER: "admin"
+      MINIO_ROOT_PASSWORD: "adminpassword"
+    command: server /data --console-address ":9001"
+    networks:
+      - admin
+
+  createbuckets:
+    container_name: CreateBucket
+    image: minio/mc
+    depends_on:
+      - minio
+    volumes:
+      - ./Dockerfiles/conf/mc-setup.sh:/usr/bin/mc-setup.sh:ro
+    entrypoint: /usr/bin/mc-setup.sh 
+    networks:
+      - admin
+
+  jupyter:
+    container_name: Jupyter 
+    build:
+      context: .
+      dockerfile: Dockerfiles/jupyter.Dockerfile
+    ports:
+      - "8888:8888"
+    volumes:
+      - jupyter_notebooks:/home/jovyan/work
+    networks:
+      - admin
+    depends_on:
+      - spark-master
+      - spark-worker-1
+      - spark-worker-2
+
+  hive-metastore:
+    container_name: Hive-Metastore
+    build:
+      context: .
+      dockerfile: Dockerfiles/hive.Dockerfile
+    ports:
+      - "9083:9083"
+    depends_on:
+      - postgres
+    networks:
+      - admin
+
+volumes:
+  minio_data:
+  postgres_data:
+  jupyter_notebooks:
+
+networks:
+  admin:
+    driver: bridge

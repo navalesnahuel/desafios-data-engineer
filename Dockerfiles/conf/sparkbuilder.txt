@@ -1,0 +1,23 @@
+- Esta es la configuracion con la cual deberias crear tu sesion de spark dentro de jupyter
+- Usa %$sparksql para correr celdas con sql
+
+from pyspark import SparkContext
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .master("spark://spark-master:7077") \
+    .config("spark.jars", """
+            /usr/local/spark/jars/aws-java-sdk-bundle-1.12.262.jar,
+            /usr/local/spark/jars/antlr4-runtime-4.9.3.jar,
+            /usr/local/spark/jars/delta-contribs_2.12-3.1.0.jar,
+            /usr/local/spark/jars/delta-iceberg_2.12-3.1.0.jar,
+            /usr/local/spark/jars/delta-spark_2.12-3.1.0.jar,
+            /usr/local/spark/jars/delta-storage-3.1.0.jar,
+            /usr/local/spark/jars/hadoop-aws-3.3.4.jar""") \
+    .appName("SparkTest") \
+    .getOrCreate()
+
+spark.sparkContext.setLogLevel("ERROR")
+
+%load_ext sparksql_magic
+%config SparkSql.limit=10

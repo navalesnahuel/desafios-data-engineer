@@ -1,0 +1,10 @@
+# Ignorar directorios de dependencias y cache de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+.Python
+*.egg-info/
+*.egg
